@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>if(/^ko/i.test(navigator.language||'')){document.documentElement.translate=false;document.head.append(Object.assign(document.createElement('meta'),{name:'google',content:'notranslate'}))}</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="맥↔윈도우로 보낸 파일의 깨진 이름·글자·압축을 원본은 그대로 두고 새 파일로 고쳐 줘요. 브라우저에서만 처리해요.">
+<meta property="og:title" content="WIN MAC">
+<meta property="og:description" content="맥↔윈도우로 보낸 파일이 깨졌다면, 끌어다 놓기만 하세요.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://winmac.arapshow.net/">
+<link rel="canonical" href="https://winmac.arapshow.net/">
+<title>WINMAC</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;500;900&family=Outfit:wght@300;600;800&display=swap">
+<style>
+/* 레이아웃: 화면 전체를 반으로 나눠 왼쪽 윈도우 바탕화면, 오른쪽 맥 바탕화면. 좁은 폭은 위(윈도우)·아래(맥). 가운데 선 위에서 파일이 건너간다. */
+:root{
+  --bg:#0b0e14; --ink:#0d1320; --sub:#5d6677; --page:#f4f6f9; --line:#d9dee7;
+  --win-a:#06255e; --win-b:#1a73e8; --win-c:#7cc4ff;
+  --mac-a:#3a1c6b; --mac-b:#e8567a; --mac-c:#ffb45c;
+  --glass:rgba(255,255,255,.16); --glassd:rgba(10,14,24,.38); --ok:#2ee59d; --warn:#ff6b70;
+  --f-ko:'Noto Sans KR',system-ui,sans-serif; --f-en:'Outfit','Noto Sans KR',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--f-ko);word-break:keep-all}
+.page{min-height:100svh;display:flex;flex-direction:column}
+.side{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* stage */
+.stage{position:relative;display:grid;grid-template-columns:1fr 1fr;flex:none;height:55svh;min-height:400px;overflow:hidden;color:#fff;z-index:2;box-shadow:0 22px 38px -14px rgba(8,16,40,.5),0 2px 0 rgba(255,255,255,.5)}
+.desk{position:relative;overflow:hidden;min-width:0}
+.win{background:radial-gradient(120% 90% at 30% 20%,var(--win-c) 0,var(--win-b) 38%,var(--win-a) 100%);background-size:140% 140%;animation:drift 18s ease-in-out infinite alternate}
+.mac{background:linear-gradient(160deg,var(--mac-a) 0,var(--mac-b) 58%,var(--mac-c) 100%);background-size:150% 150%;animation:drift 22s ease-in-out infinite alternate-reverse}
+@keyframes drift{to{background-position:100% 100%}}
+.bloom{position:absolute;inset:auto;left:50%;top:44%;width:62%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;filter:blur(40px);opacity:.5;animation:breathe 9s ease-in-out infinite}
+.win .bloom{background:conic-gradient(from 20deg,#bfe3ff,#2b8cff,#7ab8ff,#bfe3ff)}
+.mac .bloom{background:conic-gradient(from 200deg,#ffd29a,#e8567a,#7a3fd1,#ffd29a)}
+@keyframes breathe{50%{transform:translate(-50%,-50%) scale(1.12);opacity:.62}}
+/* desktop icons */
+.ic{position:absolute;width:76px;text-align:center;font-size:12px;line-height:1.3;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.ic .g{display:block;margin:0 auto 5px;width:42px;height:42px}
+.ic span{display:block;overflow-wrap:anywhere}
+.win .ic.a{left:18px;top:10px}.win .ic.b{left:18px;top:98px}.win .ic.c{left:18px;bottom:60px;top:auto}
+.mac .ic.a{right:18px;top:10px}.mac .ic.b{right:18px;top:98px}.mac .ic.c{right:18px;bottom:60px;top:auto}
+.file{transition:opacity .3s,transform .4s}
+.file[hidden]{display:block!important;opacity:0;transform:scale(.7)}
+.file .g{filter:drop-shadow(0 4px 8px rgba(0,0,0,.3))}
+.file span{background:rgba(0,0,0,.28);border-radius:5px;padding:1px 4px}
+.file.bad span{background:rgba(255,107,112,.85)}
+.file.good span{background:rgba(46,229,157,.9);color:#032}
+
+/* 앱 창 */
+.wnd{position:absolute;z-index:1;display:flex;flex-direction:column;overflow:hidden;color:#1d2330;font-size:12px;box-shadow:0 22px 56px rgba(0,0,0,.38)}
+.win .wnd{left:104px;right:68px;top:98px;bottom:60px;border-radius:8px;background:#f8fafd}
+.mac .wnd{left:68px;right:104px;top:98px;bottom:60px;border-radius:12px;background:rgba(255,255,255,.9);backdrop-filter:blur(22px)}
+.wnd .tt{height:34px;flex:none;display:flex;align-items:center;gap:8px}
+.w .tt{background:#e8eef7;padding-left:10px}
+.w .tt b{font-weight:500}
+.w .ctl{margin-left:auto;display:flex;height:100%}
+.w .ctl i{width:42px;display:flex;align-items:center;justify-content:center}.w .ctl i svg{width:10px;height:10px}
+.mc .tt{padding:0 12px;background:rgba(235,238,245,.9);justify-content:center;position:relative}
+.mc .tt b{font-weight:600}
+.mc .tl{position:absolute;left:12px;display:flex;gap:7px}
+.mc .tl i{width:12px;height:12px;border-radius:50%}
+.w .bar{height:30px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px;border-bottom:1px solid #dfe5ef}
+.w .bar .path{flex:1;background:#fff;border:1px solid #d9dfeb;border-radius:4px;padding:3px 8px;white-space:nowrap;overflow:hidden}
+.w .bar .srch{width:20%;min-width:56px;background:#fff;border:1px solid #d9dfeb;border-radius:4px;padding:3px 8px;color:#8a93a6}
+.w .bar .arr{color:#8a93a6;letter-spacing:.1em;white-space:nowrap}
+.wnd .body{flex:1;display:flex;min-height:0}
+.wnd .nav{width:26%;max-width:128px;flex:none;padding:10px 6px;display:flex;flex-direction:column;gap:3px}
+.w .nav{background:#f1f5fb;border-right:1px solid #e1e7f1}
+.mc .nav{background:rgba(228,232,242,.75)}
+.nav u{text-decoration:none;padding:5px 8px;border-radius:5px;white-space:nowrap;overflow:hidden}
+.w .nav u.on{background:#d4e4fb}.mc .nav u.on{background:rgba(26,115,232,.22)}
+.nav em{font-style:normal;font-size:10px;color:#8a93a6;padding:0 8px 2px}
+.wnd .files{flex:1;min-width:0;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:6px;align-content:start;overflow:hidden}
+.wnd .ic{position:static;width:auto;color:#1d2330;text-shadow:none}
+.wnd .ic span{padding:1px 4px}
+.wnd .file.good span{background:var(--ok);color:#032}
+/* windows taskbar */
+.tb{position:absolute;left:0;right:0;bottom:0;height:46px;background:rgba(240,246,255,.82);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;gap:10px;color:#0d1320}
+.tb i{display:block;width:26px;height:26px;border-radius:7px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.tb .st{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:20px;height:20px;background:none;box-shadow:none;animation:glow 4s ease-in-out infinite}
+.tb .st b{background:#0a63d0;border-radius:1px}
+@keyframes glow{50%{filter:drop-shadow(0 0 5px #5aa2ff)}}
+.tb .tray{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:center;gap:12px;padding:0 16px;background:linear-gradient(90deg,rgba(240,246,255,0),rgba(214,228,250,.9) 30%)}
+.tray svg{width:16px;height:16px}
+/* mac menubar + dock */
+.mb{position:absolute;left:0;right:0;top:0;height:28px;background:var(--glassd);backdrop-filter:blur(12px);display:flex;align-items:center;gap:16px;padding:0 14px;font-size:12px;font-weight:500}
+.mb .ap{font-size:15px}.mb .r{margin-left:auto;font-family:var(--f-en);font-weight:600}
+.dock{position:absolute;left:0;right:clamp(40px,6.5vw,96px);bottom:0;height:46px;display:flex;align-items:center;justify-content:center;gap:9px;padding:0 14px;background:rgba(255,255,255,.2);backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.4);border-right:1px solid rgba(255,255,255,.4);border-radius:0 16px 0 0}
+.dock i{display:block;flex:none;width:32px;height:32px;border-radius:9px;transform-origin:50% 100%;animation:hop 6s ease-in-out infinite}
+.dock i:nth-child(2){animation-delay:.7s}.dock i:nth-child(3){animation-delay:1.4s}.dock i:nth-child(4){animation-delay:2.1s}
+@keyframes hop{0%,86%,100%{transform:none}92%{transform:translateY(-9px) scale(1.14)}}
+.dock .sep{flex:none;width:1px;height:28px;background:rgba(255,255,255,.45);border-radius:0;animation:none}
+/* cursors */
+.cur{position:absolute;width:20px;height:20px;z-index:3;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+.win .cur{animation:wander 14s ease-in-out infinite alternate}
+.mac .cur{animation:wander 17s ease-in-out infinite alternate-reverse}
+@keyframes wander{0%{left:35%;top:32%}35%{left:62%;top:52%}70%{left:44%;top:68%}100%{left:70%;top:30%}}
+/* center */
+.mid{position:absolute;left:50%;top:0;bottom:0;width:0;z-index:6;pointer-events:none}
+.mid:before{content:"";position:absolute;left:-1px;top:0;bottom:0;width:2px;background:rgba(255,255,255,.7)}
+.mid .logo{position:absolute;left:0;top:5%;height:1em;font-size:clamp(30px,4.4vw,56px);font-family:var(--f-en);color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.35)}
+.logo b{position:absolute;top:0;white-space:nowrap;font-weight:800;font-size:1em;letter-spacing:.04em;line-height:1}
+.logo b:first-child{right:.16em;margin-right:-.04em}
+.logo b:last-child{left:.16em}
+.logo i{font-style:normal;font-weight:300;font-size:clamp(26px,4vw,52px);line-height:1}
+.dz{position:absolute;left:0;top:50%;transform:translate(-50%,-50%);width:clamp(132px,15vw,176px);aspect-ratio:1;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:rgba(255,255,255,.26);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;border:2px dashed rgba(255,255,255,.85);text-shadow:0 1px 6px rgba(0,0,0,.35);pointer-events:auto;cursor:pointer;box-shadow:0 10px 40px rgba(0,0,0,.18);transition:transform .25s,box-shadow .25s,background .25s}
+.dz b{font-family:var(--f-en);font-weight:800;letter-spacing:.2em;font-size:15px}
+.dz span{font-size:12px;font-weight:500;color:rgba(255,255,255,.92)}
+.dz:before{content:"";position:absolute;inset:-12px;border-radius:50%;border:2px solid rgba(255,255,255,.7);animation:ring 2.8s ease-out infinite}
+@keyframes ring{from{transform:scale(.86);opacity:.9}to{transform:scale(1.25);opacity:0}}
+.cap{position:absolute;left:0;top:calc(50% + clamp(82px,9vw,100px));transform:translateX(-50%);background:rgba(13,19,32,.72);color:#fff;font-size:13px;font-weight:500;padding:7px 14px;border-radius:999px;white-space:nowrap;opacity:0;transition:opacity .4s}
+.cap.on{opacity:1}
+.chip.scan:after{content:"";position:absolute;top:0;bottom:0;width:30%;left:-30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.9),transparent);animation:scan 1.6s ease-in-out infinite}
+@keyframes scan{to{left:100%}}
+.chip{overflow:hidden}
+.dz.over,.dz.take{background:rgba(255,255,255,.4);transform:translate(-50%,-50%) scale(1.1);box-shadow:0 14px 50px rgba(0,0,0,.4)}
+.dz:focus-within{outline:3px solid #fff;outline-offset:4px}
+.chip{position:absolute;left:0;top:0;z-index:8;pointer-events:none;font-family:var(--f-en);font-weight:600;font-size:15px;padding:10px 16px;border-radius:12px;background:#fff;color:#0d1320;white-space:nowrap;opacity:0;box-shadow:0 10px 30px rgba(0,0,0,.35);transition:transform 3.2s cubic-bezier(.45,.05,.25,1),opacity .4s}
+.chip .b{position:absolute;inset:10px 16px;opacity:0}.chip .a,.chip .b{transition:opacity .25s}
+.chip.sw .a{opacity:0}.chip.sw .b{opacity:1}.chip.sw{background:var(--ok);color:#032}
+/* below */
+.lowtxt{max-width:1120px;width:100%;margin:0 auto;padding-block:clamp(26px,4.6svh,52px) 14px;flex:1;display:flex;flex-direction:column;justify-content:center}
+h1{margin:0;font-weight:900;font-size:clamp(24px,min(3.4vw,4.8svh),42px);line-height:1.12;letter-spacing:-.035em;text-wrap:balance}
+h1 em{font-style:normal;color:#1a73e8}
+.lead strong{font-weight:500;color:var(--ink)}
+.lead{margin:14px 0 0;font-weight:300;font-size:clamp(15px,1.5vw,18px);line-height:1.6;color:var(--sub)}
+.m{display:none}
+.list{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,auto);grid-auto-flow:column;gap:clamp(18px,3svh,32px) 40px;margin:clamp(22px,3.6svh,40px) 0 0;padding:0;list-style:none}
+.list li{display:grid;grid-template-columns:auto 1fr;column-gap:16px;align-items:start;padding-top:16px;border-top:1px solid var(--line);cursor:pointer;min-width:0;transition:border-color .3s}
+.list li.on{border-top-color:#1a73e8}
+.list li.on .n{color:#1a73e8}
+.list li:focus-visible{outline:2px solid #1a73e8;outline-offset:4px}
+.list .n{font-family:var(--f-en);font-weight:300;font-size:30px;line-height:1;letter-spacing:.02em;color:#b3bacb;transition:color .3s;min-width:2ch;padding-top:1px}
+.list .c{min-width:0}
+.list b{display:block;margin-top:12px;font-weight:500;font-size:clamp(15px,1.35vw,17px);line-height:1.5;letter-spacing:-.01em}
+.list p{margin:8px 0 0;font-size:13px;font-weight:300;line-height:1.75;color:var(--sub)}
+.list .tag{display:inline-flex;align-items:center;gap:5px;font-style:normal;margin-left:0;padding:2px 9px;border-radius:999px;background:rgba(26,115,232,.1);color:#1a73e8;font-family:var(--f-en);font-weight:600;font-size:11px;letter-spacing:.1em}
+.tag .ar{width:13px;height:13px}
+.tag .spin{animation:spin 5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.list small{display:block;margin-top:9px;font-family:var(--f-en),var(--f-ko);font-size:12px;font-weight:500;color:var(--ink);opacity:.72;line-height:1.7;overflow-wrap:anywhere}
+footer span.n{opacity:.8}
+footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--sub)}
+@media (max-width:760px){
+  .win .wnd{left:14px;right:14px;top:56px;bottom:82px}.mac .wnd{left:14px;right:14px;top:62px;bottom:58px}
+  .wnd .bar,.wnd .nav{display:none}.wnd .tt{height:26px}.wnd .files{padding:8px;grid-template-columns:repeat(3,1fr)}
+  .dz{width:116px}.cap{top:calc(50% + 70px)}
+  .stage{min-height:420px}
+
+  .dock{right:0;left:0;border-radius:0}.dock i:nth-child(n+7){display:none}
+  .stage{grid-template-columns:1fr;grid-template-rows:1fr 1fr;min-height:380px}
+  .mid{left:0;right:0;top:0;bottom:0;width:auto}
+  .mid:before{left:0;right:0;top:calc(50% - 1px);bottom:auto;width:auto;height:2px}
+  .mid .logo{left:50%;top:10px}
+  .win .ic.a{top:16px}.tb{bottom:30px}
+  .dz{left:50%;top:50%}.cap{left:50%;top:calc(50% + 88px)}
+  .win .ic.b,.mac .ic.b{display:none}.win .ic.c{display:none}.mac .ic.c{display:none}
+  .win .ic.a{left:14px}.mac .ic.a{right:14px;top:16px}
+  
+  .m{display:inline}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}.chip{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="page">
+<section class="stage" id="stage" aria-label="윈도우와 맥 바탕화면 예시">
+  <div class="desk win" id="win">
+    <div class="bloom"></div>
+    <div class="ic a"><svg class="g" viewBox="0 0 42 42"><path d="M9 11h24l-2 26H11z" fill="#dff1ff" opacity=".9"/><path d="M7 11h28M16 11V8h10v3" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M21 17v13M16 18l1 12M26 18l-1 12" stroke="#4aa3ff" stroke-width="1.6" stroke-linecap="round"/></svg><span>휴지통</span></div>
+    <div class="ic b"><svg class="g" viewBox="0 0 42 42"><path d="M4 12a3 3 0 013-3h10l4 4h14a3 3 0 013 3v17a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#ffd45e"/><path d="M4 18h38v15a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#ffc23a"/></svg><span>문서</span></div>
+    <div class="ic c"><svg class="g" viewBox="0 0 42 42"><path d="M4 12a3 3 0 013-3h10l4 4h14a3 3 0 013 3v17a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#ffd45e"/><path d="M4 18h38v15a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#ffc23a"/><rect x="14" y="19" width="14" height="14" rx="1.2" fill="#fff"/><rect x="15.5" y="20.5" width="5" height="5" fill="#69b7ff"/><rect x="21.5" y="20.5" width="5" height="5" fill="#69b7ff"/><rect x="15.5" y="26.5" width="5" height="5" fill="#69b7ff"/><rect x="21.5" y="26.5" width="5" height="5" fill="#69b7ff"/><rect x="12.5" y="32.6" width="17" height="1.6" rx=".8" fill="#fff"/></svg><span>WIN</span></div>    <div class="wnd w"><div class="tt"><svg viewBox="0 0 16 16" width="14" height="14"><path d="M1 4a1 1 0 011-1h4l1.5 1.5H14a1 1 0 011 1V12a1 1 0 01-1 1H2a1 1 0 01-1-1z" fill="#ffc23a"/></svg><b>받은 파일</b><div class="ctl"><i><svg viewBox="0 0 10 10"><path d="M1 5h8" stroke="#1d2330" stroke-width="1"/></svg></i><i><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="#1d2330"/></svg></i><i><svg viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="#1d2330" stroke-width="1.1"/></svg></i></div></div><div class="bar"><span class="arr">←&nbsp;→&nbsp;↑</span><span class="path">내 PC › 문서 › 받은 파일</span><span class="srch">검색</span></div><div class="body"><div class="nav"><u>홈</u><u>바탕 화면</u><u class="on">문서</u><u>사진</u></div><div class="files"><div class="ic"><svg class="g" viewBox="0 0 42 42"><path d="M10 4h16l8 8v26H10z" fill="#fff" stroke="#cfd6e4"/><path d="M26 4v8h8" fill="#e6ebf5"/><path d="M15 20h14M15 25h14M15 30h9" stroke="#2b6cd8" stroke-width="2" stroke-linecap="round"/></svg><span>보고서.docx</span></div><div class="ic"><svg class="g" viewBox="0 0 42 42"><rect x="5" y="8" width="32" height="26" rx="3" fill="#fff" stroke="#cfd6e4"/><path d="M7 31l9-10 7 7 5-5 8 8z" fill="#7cc4ff"/><circle cx="29" cy="15" r="3" fill="#ffc23a"/></svg><span>사진.jpg</span></div><div class="ic file good" id="winfile" hidden><svg class="g" viewBox="0 0 42 42"><path d="M10 4h16l8 8v26H10z" fill="#fff" stroke="#cfd6e4"/><path d="M26 4v8h8" fill="#e6ebf5"/><path d="M15 20h14M15 25h14M15 30h9" stroke="#1a73e8" stroke-width="2" stroke-linecap="round"/></svg><span id="winname">한글.txt</span></div></div></div></div>
+    <svg class="cur" viewBox="0 0 20 20"><path d="M3 2l13 7-6 1.5L7.5 17z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg>
+    <div class="tb"><i class="st"><b></b><b></b><b></b><b></b></i><i></i><i style="background:#ffd45e"></i><i style="background:#8fd0ff"></i><i style="background:#c7f0d0"></i><div class="tray"><svg viewBox="0 0 16 16"><path d="M3 10l5-5 5 5" fill="none" stroke="#0d1320" stroke-width="1.6" stroke-linecap="round"/></svg><svg viewBox="0 0 16 16"><path d="M1.5 6a9 9 0 0113 0M4 8.6a5.5 5.5 0 018 0M6.4 11a2 2 0 013.2 0" fill="none" stroke="#0d1320" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="1" fill="#0d1320"/></svg><svg viewBox="0 0 16 16"><path d="M2 6h3l4-3v10l-4-3H2z" fill="#0d1320"/><path d="M11 5.5a3.5 3.5 0 010 5" fill="none" stroke="#0d1320" stroke-width="1.4" stroke-linecap="round"/></svg><svg viewBox="0 0 16 16"><rect x="1.5" y="4.5" width="11" height="7" rx="1.5" fill="none" stroke="#0d1320" stroke-width="1.4"/><rect x="3" y="6" width="6" height="4" fill="#0d1320"/><path d="M14 7v2" stroke="#0d1320" stroke-width="1.6"/></svg></div></div>
+  </div>
+
+  <div class="desk mac" id="mac">
+    <div class="bloom"></div>
+    <div class="ic a"><svg class="g" viewBox="0 0 42 42"><rect x="5" y="9" width="32" height="24" rx="5" fill="#e9edf5"/><rect x="5" y="25" width="32" height="8" rx="4" fill="#b9c2d4"/><circle cx="31" cy="29" r="1.8" fill="#4ad06a"/></svg><span>Macintosh HD</span></div>
+    <div class="ic b"><svg class="g" viewBox="0 0 42 42"><path d="M4 12a3 3 0 013-3h10l4 4h14a3 3 0 013 3v17a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#6cc0ff"/><path d="M4 18h38v15a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#42a5f5"/></svg><span>문서</span></div>
+    <div class="ic c"><svg class="g" viewBox="0 0 42 42"><path d="M4 12a3 3 0 013-3h10l4 4h14a3 3 0 013 3v17a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#6cc0ff"/><path d="M4 18h38v15a3 3 0 01-3 3H7a3 3 0 01-3-3z" fill="#42a5f5"/><path d="M21 22.4c-2-1.6-6.6-.8-6.6 4 0 3.6 2.4 6.6 4.4 6.6 1 0 1.5-.5 2.2-.5s1.2.5 2.2.5c2 0 4.4-3 4.4-6.6 0-4.800-4.600-5.600-6.600-4z" fill="#e8353b"/><path d="M21 22.4c0-1.600.4-2.800 1.400-3.800" stroke="#6b3a1d" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M22.600 19.800c1.400-1.400 3.200-1.200 4-.4-.4 1.400-2.200 2.200-4 .4z" fill="#3cb860"/></svg><span>MAC</span></div>    <div class="wnd mc"><div class="tt"><div class="tl"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><b>받은 파일</b></div><div class="body"><div class="nav"><em>즐겨찾기</em><u>최근 항목</u><u class="on">문서</u><u>사진</u></div><div class="files"><div class="ic"><svg class="g" viewBox="0 0 42 42"><path d="M10 4h16l8 8v26H10z" fill="#fff" stroke="#cfd6e4"/><path d="M26 4v8h8" fill="#e6ebf5"/><path d="M15 20h14M15 25h14M15 30h9" stroke="#e8567a" stroke-width="2" stroke-linecap="round"/></svg><span>기획.pdf</span></div><div class="ic"><svg class="g" viewBox="0 0 42 42"><rect x="5" y="8" width="32" height="26" rx="3" fill="#fff" stroke="#cfd6e4"/><path d="M7 31l9-10 7 7 5-5 8 8z" fill="#7cc4ff"/><circle cx="29" cy="15" r="3" fill="#ffc23a"/></svg><span>사진.jpg</span></div><div class="ic file good" id="macfile" hidden><svg class="g" viewBox="0 0 42 42"><path d="M10 4h16l8 8v26H10z" fill="#fff" stroke="#cfd6e4"/><path d="M26 4v8h8" fill="#e6ebf5"/><path d="M15 20h14M15 25h14M15 30h9" stroke="#e8567a" stroke-width="2" stroke-linecap="round"/></svg><span id="macname">한글.txt</span></div></div></div></div>
+    <svg class="cur" viewBox="0 0 20 20"><path d="M3 2l13 7-6 1.5L7.5 17z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg>
+    <div class="dock"><i style="background:none;overflow:hidden"><svg viewBox="0 0 42 42" width="32" height="32"><rect width="42" height="42" rx="10" fill="#2f7cf6"/><path d="M0 10a10 10 0 0110-10h12c-3 9-3 24 2 42H10A10 10 0 010 32z" fill="#9fd8ff"/><path d="M22 0c-3 9-3 24 2 42" stroke="#0d1320" stroke-opacity=".35" stroke-width="1.4" fill="none"/><path d="M11 12v6M31 12v6" stroke="#0d1320" stroke-width="2.6" stroke-linecap="round"/><path d="M10 28c6 5 16 5 22 0" stroke="#0d1320" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></i><i style="background:linear-gradient(160deg,#c9b8ff,#7a5af8)"></i><i style="background:linear-gradient(160deg,#9fe3ff,#2aa7e0)"></i><i style="background:linear-gradient(160deg,#ffc9a0,#ff7a3d)"></i><i style="background:linear-gradient(160deg,#e6e8ef,#9aa3b5)"></i><i style="background:linear-gradient(160deg,#ffe28a,#f2b01e)"></i><i style="background:linear-gradient(160deg,#b8f2d0,#38c28a)"></i><i style="background:linear-gradient(160deg,#6cc0ff,#1a73e8)"></i><i style="background:linear-gradient(160deg,#6cc0ff,#1a73e8)"></i><i style="background:linear-gradient(160deg,#ffd45e,#ff9d2e)"></i><i style="background:linear-gradient(160deg,#9af0b8,#2bbf6a)"></i><i style="background:linear-gradient(160deg,#ff9aae,#e8567a)"></i><span class="sep"></span>
+      <svg viewBox="0 0 42 42" width="32" height="32" style="flex:none"><path d="M10 12h22l-2 25H12z" fill="rgba(255,255,255,.78)"/><path d="M8 12h26M16 12V9h10v3" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M21 17v14M16 18l1 13M26 18l-1 13" stroke="#8a93a6" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+  </div>
+
+  <div class="mid">
+    <div class="logo" aria-label="WINMAC"><b>WIN</b><b>MAC</b></div>
+    <div class="cap" id="cap"></div>
+    <label class="dz" id="dz" for="pick"><b>DROP</b><span>여기에 놓으세요</span><input id="pick" type="file" hidden></label>
+  </div>
+  <div class="chip" id="chip"><span class="a" id="chipa">ㅎㅏㄴㄱㅡㄹ.txt</span><span class="b" id="chipb">한글.txt</span></div>
+</section>
+
+<div class="side"><div class="lowtxt">
+  <h1>분명 잘 보냈는데,<br class="m"> <em>거기선 다 깨졌대요.</em></h1>
+  <p class="lead">맥에서 윈도우로, 윈도우에서 맥으로. 가운데에 던지면 상대 컴퓨터에 맞게 고쳐서 건네고, <strong>원본은 그대로</strong> 둡니다.</p>
+  <ul class="list" id="list"><li tabindex="0" data-k="0"><span class="n">01</span><div class="c"><i class="tag">MAC <svg class="ar" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> WIN</i><b>파일 이름이 ㅎㅏㄴㄱㅡㄹ 로 분리됐어</b><p>자모를 다시 붙여서 정상 이름으로 만들어 줘요.</p><small>ㅎㅏㄴㄱㅡㄹ.txt → 한글.txt</small></div></li><li tabindex="0" data-k="1"><span class="n">02</span><div class="c"><i class="tag">MAC <svg class="ar" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> WIN</i><b>압축 풀었더니 모르는 이상한 파일이 있어</b><p>맥이 몰래 넣은 파일을 빼고, 한글 이름도 살려요.</p><small>._ · __MACOSX · .DS_Store 빼기</small></div></li><li tabindex="0" data-k="2"><span class="n">03</span><div class="c"><i class="tag">MAC <svg class="ar spin" viewBox="0 0 16 16"><path d="M13 6.5A5.5 5.5 0 003.2 5M3 2.5V5h2.5M3 9.5A5.5 5.5 0 0012.8 11M13 13.5V11h-2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> WIN</i><b>열었더니 글자가 외계인 말로 깨져있어</b><p>저장 방식을 맞춰서 한글로 보이게 해요.</p><small>ÀÌ¸§.csv → 이름.csv</small></div></li><li tabindex="0" data-k="3"><span class="n">04</span><div class="c"><i class="tag">MAC <svg class="ar spin" viewBox="0 0 16 16"><path d="M13 6.5A5.5 5.5 0 003.2 5M3 2.5V5h2.5M3 9.5A5.5 5.5 0 0012.8 11M13 13.5V11h-2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> WIN</i><b>분명 엔터쳤는데 글이 다 한 줄로 붙어있어</b><p>줄바꿈을 상대 컴퓨터 방식으로 맞춰요.</p><small>한 줄로 뭉친 글 → 줄 정리</small></div></li><li tabindex="0" data-k="4"><span class="n">05</span><div class="c"><i class="tag">MAC <svg class="ar" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> WIN</i><b>파일 이름에 못 쓰는 글자가 있다고 안된데</b><p>쓸 수 없는 글자와 긴 이름을 미리 고쳐요.</p><small>회의:10/20? → 회의_10-20</small></div></li><li tabindex="0" data-k="5"><span class="n">06</span><div class="c"><i class="tag">MAC <svg class="ar" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> WIN</i><b>이 파일은 윈도우에서 안 열린다고요?!</b><p>못 여는 형식은 열 수 있는 길을 알려 줘요.</p><small>.pages → 열 수 있는 파일</small></div></li></ul>
+  <footer><span>Bros.Site ▾ · 응원 · 문의 · 공유</span><span class="n">&copy; 2026 ARAPSHOW. All rights reserved.</span><span>coded by arapshow</span></footer>
+</div></div>
+
+</div>
+<script src="/lib/vendor/fflate.min.js?v=1"></script>
+<script>
+// WIN MAC 변환 엔진. 화면(DOM) 없이 바이트와 이름만 다룬다(테스트는 node, 화면은 브라우저가 같이 씀).
+// 규칙: 원본 바이트는 건드리지 않고 항상 새 결과를 돌려준다. 외부 부품은 fflate 하나(전역 fflate 또는 require).
+(function (root) {
+  'use strict';
+  var F = root.fflate || (typeof require === 'function' ? require('fflate') : null);
+
+  var FORBIDDEN = /[<>:"\/\\|?*\u0000-\u001f]/;
+  var FORBIDDEN_G = /[<>:"\/\\|?*\u0000-\u001f]/g;
+  var RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+  var JUNK = /(^|\/)(__MACOSX(\/|$)|\._[^\/]*$|\.DS_Store$|Thumbs\.db$|desktop\.ini$)/;
+  var MAC_JUNK = /(^|\/)(__MACOSX(\/|$)|\._[^\/]*$|\.DS_Store$)/;
+  var WIN_JUNK = /(^|\/)(Thumbs\.db|desktop\.ini)$/i;
+  var TEXT_EXT = /\.(txt|csv|tsv|md|json|xml|html?|css|js|log|srt|ini)$/i;
+  var MAC_ONLY = /\.(pages|numbers|key|heic|heif)$/i;
+
+  function nfc(s) { return s.normalize('NFC'); }
+  function isNfd(s) { return s !== s.normalize('NFC'); }
+  function ext(name) { var m = /(\.[^.\/\\]*)$/.exec(name); return m ? m[1] : ''; }
+
+  /** 파일 이름 한 개(경로 아님)를 윈도우에서 안전한 이름으로 고친다. */
+  function fixName(name) {
+    var notes = [], n = name;
+    if (isNfd(n)) { n = nfc(n); notes.push('자모를 합쳤어요'); }
+    if (FORBIDDEN.test(n)) { n = n.replace(FORBIDDEN_G, '_'); notes.push('못 쓰는 글자를 바꿨어요'); }
+    var t = n.replace(/[ .]+$/, '');
+    if (t !== n) { n = t || '_'; notes.push('끝의 점·공백을 뺐어요'); }
+    if (RESERVED.test(n)) { n = '_' + n; notes.push('예약된 이름을 피했어요'); }
+    if (n.length > 255) {
+      var e = ext(n); n = n.slice(0, 255 - e.length) + e; notes.push('이름이 너무 길어 줄였어요');
+    }
+    return { name: n, changed: n !== name, notes: notes };
+  }
+  function fixPath(path) {
+    var notes = [], parts = path.split('/').map(function (seg) {
+      if (!seg) return seg;
+      var r = fixName(seg); r.notes.forEach(function (x) { if (notes.indexOf(x) < 0) notes.push(x); }); return r.name;
+    });
+    return { path: parts.join('/'), notes: notes };
+  }
+
+  /** 글자 방식을 알아낸다: UTF-8(BOM 있음·없음), UTF-16, 아니면 옛 한글(CP949). */
+  function decodeText(u8) {
+    if (u8.length >= 3 && u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF)
+      return { text: new TextDecoder('utf-8').decode(u8.subarray(3)), enc: 'utf-8-bom' };
+    if (u8.length >= 2 && u8[0] === 0xFF && u8[1] === 0xFE)
+      return { text: new TextDecoder('utf-16le').decode(u8.subarray(2)), enc: 'utf-16' };
+    try { return { text: new TextDecoder('utf-8', { fatal: true }).decode(u8), enc: 'utf-8' }; } catch (e) { /* 아래로 */ }
+    return { text: new TextDecoder('euc-kr').decode(u8), enc: 'cp949' };
+  }
+  function lineEnding(t) {
+    var crlf = (t.match(/\r\n/g) || []).length, lf = (t.match(/\n/g) || []).length - crlf, cr = (t.match(/\r/g) || []).length - crlf;
+    if (!crlf && !lf && !cr) return 'none';
+    return crlf >= lf && crlf >= cr ? 'crlf' : (lf >= cr ? 'lf' : 'cr');
+  }
+
+  /** 글 파일 내용을 target('win'|'mac')에 맞춘 사본으로. */
+  function convertText(u8, target, name) {
+    var d = decodeText(u8), t = d.text, notes = [], le = lineEnding(t);
+    var isCsv = /\.(csv|tsv)$/i.test(name || '');
+    if (d.enc === 'cp949') notes.push('옛 한글 방식을 UTF-8로 바꿨어요');
+    if (d.enc === 'utf-16') notes.push('UTF-16을 UTF-8로 바꿨어요');
+    var norm = t.replace(/\r\n|\r/g, '\n');
+    var out = target === 'win' ? norm.replace(/\n/g, '\r\n') : norm;
+    var want = target === 'win' ? 'crlf' : 'lf';
+    if (le !== 'none' && le !== want) notes.push(target === 'win' ? '줄바꿈을 윈도우 방식으로 맞췄어요' : '줄바꿈을 맥 방식으로 맞췄어요');
+    if (isNfd(out)) { out = nfc(out); notes.push('글 속 자모를 합쳤어요'); }
+    var body = new TextEncoder().encode(out), bytes = body;
+    if (target === 'win' && isCsv) {
+      bytes = new Uint8Array(body.length + 3); bytes.set([0xEF, 0xBB, 0xBF], 0); bytes.set(body, 3);
+      if (d.enc !== 'utf-8-bom') notes.push('엑셀에서 안 깨지게 표시를 붙였어요');
+    }
+    if (target === 'mac' && d.enc === 'utf-8-bom') notes.push('윈도우 표시(BOM)를 뺐어요');
+    var same = bytes.length === u8.length && bytes.every(function (b, i) { return b === u8[i]; });
+    return { bytes: bytes, notes: notes, changed: !same, enc: d.enc };
+  }
+
+  // ---- zip 읽기: 이름의 원래 바이트를 직접 읽어야 윈도우에서 만든 zip(옛 한글 이름)도 살린다 ----
+  function u16(b, o) { return b[o] | (b[o + 1] << 8); }
+  function u32(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
+  function decodeZipName(raw, flags) {
+    if (flags & 0x800) return { name: new TextDecoder('utf-8').decode(raw), enc: 'utf-8' };
+    try { return { name: new TextDecoder('utf-8', { fatal: true }).decode(raw), enc: 'utf-8' }; } catch (e) { /* 아래로 */ }
+    return { name: new TextDecoder('euc-kr').decode(raw), enc: 'cp949' };
+  }
+  function readZip(u8) {
+    var eocd = -1;
+    for (var i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) { if (u32(u8, i) === 0x06054b50) { eocd = i; break; } }
+    if (eocd < 0) throw new Error('zip 파일이 아니에요');
+    var count = u16(u8, eocd + 10), p = u32(u8, eocd + 16), list = [];
+    for (var k = 0; k < count; k++) {
+      if (u32(u8, p) !== 0x02014b50) throw new Error('zip 목록이 깨졌어요');
+      var flags = u16(u8, p + 8), method = u16(u8, p + 10), csize = u32(u8, p + 20), usize = u32(u8, p + 24);
+      var nlen = u16(u8, p + 28), elen = u16(u8, p + 30), clen = u16(u8, p + 32), lho = u32(u8, p + 42);
+      var raw = u8.subarray(p + 46, p + 46 + nlen), dn = decodeZipName(raw, flags);
+      list.push({ name: dn.name, nameEnc: dn.enc, flags: flags, method: method, csize: csize, usize: usize, lho: lho });
+      p += 46 + nlen + elen + clen;
+    }
+    return list;
+  }
+  function entryData(u8, e) {
+    var o = e.lho, nlen = u16(u8, o + 26), elen = u16(u8, o + 28), start = o + 30 + nlen + elen;
+    var comp = u8.subarray(start, start + e.csize);
+    if (e.method === 0) return comp;
+    if (e.method === 8) return F.inflateSync(comp);
+    throw new Error('지원하지 않는 압축 방식이에요');
+  }
+
+  /** zip을 청소하고 이름을 고쳐 새 zip으로. 파일 내용은 그대로 옮긴다. */
+  function cleanZip(u8) {
+    var list = readZip(u8), files = {}, removed = [], renamed = [], used = {}, cp949 = 0;
+    list.forEach(function (e) {
+      if (e.nameEnc === 'cp949') cp949++;
+      if (/\/$/.test(e.name)) return;
+      if (JUNK.test(e.name)) { removed.push(e.name); return; }
+      var fp = fixPath(e.name), np = fp.path, base = np, n = 2;
+      while (used[np]) { var x = ext(base); np = base.slice(0, base.length - x.length) + ' (' + n++ + ')' + x; }
+      used[np] = 1;
+      if (np !== e.name || e.nameEnc === 'cp949') renamed.push({ from: e.name, to: np, notes: fp.notes });
+      files[np] = [entryData(u8, e), { level: 6 }];
+    });
+    var notes = [];
+    if (removed.length) notes.push('쓰레기 파일 ' + removed.length + '개를 뺐어요');
+    if (cp949) notes.push('깨질 한글 이름 ' + cp949 + '개를 살렸어요');
+    var nfdCount = renamed.filter(function (r) { return isNfd(r.from); }).length;
+    if (nfdCount) notes.push('자모 이름 ' + nfdCount + '개를 합쳤어요');
+    var other = renamed.filter(function (r) { return r.notes.length && !isNfd(r.from); }).length;
+    if (other) notes.push('못 쓰는 이름 ' + other + '개를 고쳤어요');
+    return { bytes: F.zipSync(files), notes: notes, removed: removed, renamed: renamed, changed: removed.length > 0 || renamed.length > 0, fileCount: Object.keys(files).length };
+  }
+
+  /** 파일이 어느 쪽에서 왔는지 짐작한다: 'win'(윈도우로 보내야 함=맥에서 옴), 'mac', 또는 null(고칠 게 없음). */
+  function detectDirection(name, u8) {
+    try {
+      if (/\.zip$/i.test(name)) {
+        var list = readZip(u8), macSign = 0, winSign = 0;
+        list.forEach(function (e) {
+          if (MAC_JUNK.test(e.name) || isNfd(e.name)) macSign++;
+          if (WIN_JUNK.test(e.name) || e.nameEnc === 'cp949') winSign++;
+        });
+        if (macSign > winSign) return 'win';
+        if (winSign > macSign) return 'mac';
+        return list.some(function (e) { return FORBIDDEN.test(e.name.replace(/\//g, '')); }) ? 'win' : null;
+      }
+      if (TEXT_EXT.test(name)) {
+        var d = decodeText(u8);
+        if (d.enc === 'cp949' || d.enc === 'utf-16' || d.enc === 'utf-8-bom') return 'mac';
+        if (isNfd(d.text)) return 'win';
+        var le = lineEnding(d.text);
+        if (le === 'crlf') return 'mac';
+        if (le === 'lf') return 'win';
+      }
+    } catch (e) { /* 이름만 본다 */ }
+    if (isNfd(name) || FORBIDDEN.test(name) || MAC_ONLY.test(name)) return 'win';
+    return null;
+  }
+
+  /** 한 파일을 통째로 처리: {dst, outName, bytes, notes, changed, kind}. */
+  function convertFile(name, u8) {
+    var dst = detectDirection(name, u8), fx = fixName(name), notes = fx.notes.slice();
+    var out = { dst: dst, srcName: name, outName: fx.name, bytes: u8, notes: notes, changed: fx.changed, kind: 'file' };
+    if (/\.zip$/i.test(name)) {
+      var z = cleanZip(u8); out.kind = 'zip'; out.bytes = z.bytes; out.zip = z;
+      out.notes = notes.concat(z.notes); out.changed = out.changed || z.changed;
+    } else if (TEXT_EXT.test(name)) {
+      var t = convertText(u8, dst === 'mac' ? 'mac' : 'win', name); out.kind = 'text'; out.bytes = t.bytes;
+      out.notes = notes.concat(t.notes); out.changed = out.changed || t.changed;
+    } else if (MAC_ONLY.test(name)) {
+      out.kind = 'macOnly'; out.notes = notes.concat(['윈도우에서 안 열리는 형식이에요. PDF로 내보내서 보내세요']);
+      out.changed = true;
+    }
+    if (!dst) dst = out.dst = out.changed ? 'win' : null;
+    return out;
+  }
+
+  var api = { fixName: fixName, fixPath: fixPath, decodeText: decodeText, convertText: convertText, readZip: readZip, cleanZip: cleanZip, detectDirection: detectDirection, convertFile: convertFile, isNfd: isNfd, nfc: nfc };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  root.WinMac = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+const $=id=>document.getElementById(id), stage=$('stage'), chip=$('chip'), dz=$('dz'), cap=$('cap'), lis=[...document.querySelectorAll('#list li[data-k]')];
+const enc=s=>new TextEncoder().encode(s), NFD=s=>s.normalize('NFD');
+// 시험용 파일: 6칸마다 그 상황의 파일을 브라우저에서 즉석으로 만든다
+const SAMPLES=[
+ ()=>({name:NFD('한글.txt'),u8:enc(NFD('안녕하세요\n한글 파일이에요\n'))}),
+ ()=>({name:'프로젝트.zip',u8:fflate.zipSync({[NFD('자료')+'/'+NFD('보고서.txt')]:enc('내용'),'__MACOSX/._보고서.txt':enc('x'),'.DS_Store':enc('y'),'readme.txt':enc('hi')})}),
+ ()=>({name:'이름.csv',u8:Uint8Array.from([0xC0,0xCC,0xB8,0xA7,0x2C,0xB0,0xAA,0x0D,0x0A,0xC7,0xD1,0xB1,0xDB,0x2C,0x31,0x0D,0x0A])}),
+ ()=>({name:'메모.txt',u8:enc('첫째 줄\r\n둘째 줄\r\n셋째 줄\r\n')}),
+ ()=>({name:'회의 10:20?.docx',u8:enc('docx')}),
+ ()=>({name:'기획.pages',u8:enc('pages')})
+];
+let n=0,busy=false,timer=null,tos=[],user=false,last=null;
+const fileEl=s=>$(s+'file'), nameEl=s=>$(s+'name');
+function pos(el){const r=el.getBoundingClientRect(),s=stage.getBoundingClientRect();return{x:r.left-s.left+r.width/2,y:r.top-s.top+r.height/2}}
+function say(t){cap.textContent=t;cap.classList.add('on')}
+function mark(i){lis.forEach((l,j)=>l.classList.toggle('on',j===i))}
+function clear(){tos.forEach(clearTimeout);tos=[];busy=false;chip.style.opacity='0';chip.classList.remove('scan','sw');cap.classList.remove('on');dz.classList.remove('take');['win','mac'].forEach(k=>{fileEl(k).hidden=true})}
+function at(ms,f){tos.push(setTimeout(f,ms))}
+const SIDE={win:'윈도우',mac:'맥'};
+function send(r){
+  if(busy)return;busy=true;
+  const from=r.srcName,to=r.outName+(r.srcName===r.outName?' ✓':'');
+  $('chipa').textContent=from;$('chipb').textContent=to;
+  const a=pos(dz);
+  chip.classList.remove('sw','scan');chip.style.transition='none';
+  chip.style.transform=`translate(${a.x-chip.offsetWidth/2}px,${a.y-chip.offsetHeight/2}px)`;
+  chip.style.opacity='0';void chip.offsetWidth;chip.style.transition='';
+  const origin=r.dst==='win'?'맥':r.dst==='mac'?'윈도우':'';
+  at(100,()=>{chip.style.opacity='1';dz.classList.add('take');say('① '+(origin?origin+'에서 온 파일 같아요':'파일을 살펴보는 중…'))});
+  if(!r.dst||!r.changed){
+    at(2600,()=>{chip.classList.add('scan');say('② 살펴보는 중…')});
+    at(4600,()=>{chip.classList.remove('scan');chip.style.opacity='0';dz.classList.remove('take');say('고칠 게 없어요. 그대로 쓰셔도 돼요')});
+    at(8800,()=>{cap.classList.remove('on');busy=false});
+    return;
+  }
+  const d=fileEl(r.dst),b=pos(d.querySelector('.g'));
+  const notes=r.notes.slice(0,2);
+  at(2600,()=>{chip.classList.add('scan');say('② '+(notes[0]||'고치는 중')+(notes.length>1?' …':''))});
+  at(4600,()=>{chip.classList.remove('scan');chip.classList.add('sw');dz.classList.remove('take')});
+  at(5600,()=>{say('③ '+SIDE[r.dst]+'로 보내는 중');chip.style.transform=`translate(${b.x-chip.offsetWidth/2}px,${b.y-chip.offsetHeight/2}px)`});
+  at(8800,()=>{chip.style.opacity='0';nameEl(r.dst).textContent=r.outName;d.hidden=false;last=r;say('④ '+SIDE[r.dst]+'에 도착: '+notes.join(' · ')+(DL?'  ·  파일을 누르면 저장':''))});
+  at(12400,()=>{cap.classList.remove('on');busy=false});
+}
+function run(name,u8){send(WinMac.convertFile(name,u8))}
+function demo(){if(user)return;clear();const i=n%SAMPLES.length;mark(i);const f=SAMPLES[i]();run(f.name,f.u8);n++}
+function loop(){clearInterval(timer);timer=setInterval(demo,13400)}
+function resume(){tos.push(setTimeout(()=>{user=false;loop()},16000))}
+function play(i){user=true;clear();clearInterval(timer);mark(i);n=i+1;const f=SAMPLES[i]();run(f.name,f.u8);resume()}
+async function handle(f){
+  user=true;clear();clearInterval(timer);mark(-1);
+  run(f.name,new Uint8Array(await f.arrayBuffer()));resume();
+}
+let DL=null;
+(async()=>{try{if(window.claude&&claude.use)DL=await claude.use('downloads')}catch(e){}})();
+async function download(r){
+  try{
+    if(DL){await DL.save({filename:r.outName,data:new Blob([r.bytes])});return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.bytes]));a.download=r.outName;document.body.appendChild(a);a.click();a.remove();
+  }catch(e){
+    if(e&&e.code==='declined')return;
+    say(e&&e.code==='rejected_extension'?'이 형식은 여기서는 저장할 수 없어요':'여기서는 저장이 안 돼요');
+    setTimeout(()=>cap.classList.remove('on'),3200);
+  }
+}
+['win','mac'].forEach(k=>{const el=fileEl(k);el.style.cursor='pointer';el.title='눌러서 저장';el.addEventListener('click',()=>{if(last)download(last)})});
+lis.forEach((l,i)=>{l.addEventListener('click',()=>play(i));l.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();play(i)}})});
+['dragenter','dragover'].forEach(e=>stage.addEventListener(e,ev=>{ev.preventDefault();dz.classList.add('over')}));
+['dragleave','drop'].forEach(e=>stage.addEventListener(e,ev=>{ev.preventDefault();dz.classList.remove('over')}));
+stage.addEventListener('drop',ev=>{const f=ev.dataTransfer&&ev.dataTransfer.files[0];if(f)handle(f)});
+$('pick').addEventListener('change',ev=>{const f=ev.target.files[0];if(f)handle(f);ev.target.value=''});
+if(matchMedia('(prefers-reduced-motion:reduce)').matches){mark(0)}
+else{setTimeout(demo,700);loop()}
+</script>
+
+</body>
+</html>
