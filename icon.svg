@@ -2,7 +2,7 @@
   <defs>
     <linearGradient id="lt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f9ff"/><stop offset="1" stop-color="#cfe2f5"/></linearGradient>
     <clipPath id="sq"><rect width="512" height="512" rx="112"/></clipPath>
-    <clipPath id="Lreg"><path d="M-10 -10 L302 -10 C268 62 200 132 194 204 C192 224 200 232 216 240 L262 260 C278 267 286 276 286 292 L286 522 L-10 522 Z"/></clipPath>
+    <clipPath id="Lreg"><path d="M-10 -10 L302 -10 C270 64 204 140 198 236 L286 236 L286 522 L-10 522 Z"/></clipPath>
   </defs>
   <g clip-path="url(#sq)">
     <!-- 오른쪽: 파인더의 밝은 반 -->
@@ -16,7 +16,7 @@
       <path d="M165.0 267.2 L171.0 269.5 L177.1 271.7 L183.1 273.8 L189.2 275.6 L195.2 277.2 L201.2 278.6 L207.3 279.6 L213.3 280.4 L219.4 280.9 L225.4 281.0 L231.5 280.8 L237.5 280.3 L243.5 279.5 L249.6 278.4 L255.6 277.0 L261.7 275.4 L267.7 273.5 L273.8 271.4 L279.8 269.2 L285.8 266.8 L291.9 264.4 L297.9 261.9 L304.0 259.3 L310.0 256.8 L310.0 567.8 L304.0 570.3 L297.9 572.9 L291.9 575.4 L285.8 577.8 L279.8 580.2 L273.8 582.4 L267.7 584.5 L261.7 586.4 L255.6 588.0 L249.6 589.4 L243.5 590.5 L237.5 591.3 L231.5 591.8 L225.4 592.0 L219.4 591.9 L213.3 591.4 L207.3 590.6 L201.2 589.6 L195.2 588.2 L189.2 586.6 L183.1 584.8 L177.1 582.7 L171.0 580.5 L165.0 578.2 Z" fill="#ffba08"/>
     </g>
     <!-- 파인더 얼굴: 코 선, 눈, 입 -->
-    <path d="M302 -10 C268 62 200 132 194 204 C192 224 200 232 216 240 L262 260 C278 267 286 276 286 292 L286 522" fill="none" stroke="#23272e" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M302 -10 C270 64 204 140 198 236 L286 236 L286 522" fill="none" stroke="#23272e" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
     <g fill="#23272e">
       <rect x="102" y="146" width="34" height="84" rx="7"/>
       <rect x="352" y="146" width="34" height="84" rx="7"/>
