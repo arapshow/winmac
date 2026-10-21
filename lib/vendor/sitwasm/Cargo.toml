@@ -1,0 +1,17 @@
+[package]
+name = "sitwasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+stuffit = { version = "=0.4.0", default-features = false }
+encoding_rs = "0.8"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
