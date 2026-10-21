@@ -205,6 +205,8 @@ footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);display
 
 </div>
 <script src="/lib/vendor/fflate.min.js?v=1"></script>
+<script src="/lib/vendor/wasi-shim.min.js?v=1"></script>
+<script src="/lib/egg.js?v=1"></script>
 <script>
 // WIN MAC 변환 엔진. 화면(DOM) 없이 바이트와 이름만 다룬다(테스트는 node, 화면은 브라우저가 같이 씀).
 // 규칙: 원본 바이트는 건드리지 않고 항상 새 결과를 돌려준다. 외부 부품은 fflate 하나(전역 fflate 또는 require).
@@ -426,7 +428,7 @@ function send(r){
   const notes=r.notes.slice(0,2);
   at(2600,()=>{chip.classList.add('scan');say('② '+(notes[0]||'고치는 중')+(notes.length>1?' …':''))});
   at(4600,()=>{chip.classList.remove('scan');chip.classList.add('sw');dz.classList.remove('take')});
-  at(5600,()=>{say('③ '+SIDE[r.dst]+'로 보내는 중');chip.style.transform=`translate(${b.x-chip.offsetWidth/2}px,${b.y-chip.offsetHeight/2}px)`});
+  at(5600,()=>{say('③ '+SIDE[r.dst]+(r.dst==='mac'?'으로':'로')+' 보내는 중');chip.style.transform=`translate(${b.x-chip.offsetWidth/2}px,${b.y-chip.offsetHeight/2}px)`});
   at(8800,()=>{chip.style.opacity='0';nameEl(r.dst).textContent=r.outName;d.hidden=false;last=r;say('④ '+SIDE[r.dst]+'에 도착: '+notes.join(' · ')+(DL?'  ·  파일을 누르면 저장':''))});
   at(12400,()=>{cap.classList.remove('on');busy=false});
 }
@@ -437,7 +439,31 @@ function resume(){tos.push(setTimeout(()=>{user=false;loop()},16000))}
 function play(i){user=true;clear();clearInterval(timer);mark(i);n=i+1;const f=SAMPLES[i]();run(f.name,f.u8);resume()}
 async function handle(f){
   user=true;clear();clearInterval(timer);mark(-1);
-  run(f.name,new Uint8Array(await f.arrayBuffer()));resume();
+  const u8=new Uint8Array(await f.arrayBuffer());
+  if(WinMacEgg.isEgg(u8)){await egg(f.name,u8);resume();return}
+  run(f.name,u8);resume();
+}
+// 알집(.egg)은 맥에서 기본으로 안 열린다: 브라우저 안에서 풀어 zip으로 다시 담아 맥으로 보낸다
+async function egg(name,u8,password){
+  say('알집(egg) 파일이에요. 푸는 중…');
+  await new Promise(ok=>setTimeout(ok,60)); // 자막이 먼저 보이게 한 박자 쉼(푸는 동안 화면이 멈춤)
+  let r;
+  try{r=await WinMacEgg.unEgg(u8,{password})}catch(e){r={ok:false,error:String(e)}}
+  if(!r.ok&&r.needPassword){
+    const pw=prompt(password?'암호가 맞지 않아요. 다시 넣어 주세요':'암호가 걸린 egg예요. 암호를 넣어 주세요');
+    if(pw)return egg(name,u8,pw);
+    say('암호가 없어서 풀지 못했어요');setTimeout(()=>cap.classList.remove('on'),3200);return;
+  }
+  if(!r.ok){say('이 egg는 풀지 못했어요. 나눠 압축한 egg라면 아직 안 돼요');setTimeout(()=>cap.classList.remove('on'),4200);return}
+  // 사진·영상처럼 이미 압축된 파일이 대부분이라 다시 압축하지 않고 담기만 한다(빠름)
+  const tree={};
+  r.files.forEach(x=>{tree[x.path]=x.bytes});
+  r.dirs.forEach(d=>{if(!r.files.some(x=>x.path.startsWith(d+'/'))&&!r.dirs.some(o=>o.startsWith(d+'/')))tree[d+'/']=new Uint8Array(0)});
+  const zipName=name.replace(/\.egg$/i,'')+'.zip';
+  const out=WinMac.convertFile(zipName,fflate.zipSync(tree,{level:0}));
+  out.srcName=name;out.dst='mac';out.changed=true;
+  out.notes=['egg를 zip으로 바꿨어요'].concat(out.notes.filter(x=>x!=='자모를 합쳤어요'));
+  clear();send(out);
 }
 let DL=null;
 (async()=>{try{if(window.claude&&claude.use)DL=await claude.use('downloads')}catch(e){}})();
