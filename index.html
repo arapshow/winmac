@@ -452,7 +452,7 @@ async function download(r){
   }
 }
 ['win','mac'].forEach(k=>{const el=fileEl(k);el.style.cursor='pointer';el.title='눌러서 저장';el.addEventListener('click',()=>{if(last)download(last)})});
-lis.forEach((l,i)=>{l.addEventListener('click',()=>play(i));l.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();play(i)}})});
+lis.forEach((l,i)=>{const open=()=>{user=true;clear();clearInterval(timer);mark(i);resume();$('pick').click()};l.addEventListener('click',open);l.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})});
 ['dragenter','dragover'].forEach(e=>stage.addEventListener(e,ev=>{ev.preventDefault();dz.classList.add('over')}));
 ['dragleave','drop'].forEach(e=>stage.addEventListener(e,ev=>{ev.preventDefault();dz.classList.remove('over')}));
 stage.addEventListener('drop',ev=>{const f=ev.dataTransfer&&ev.dataTransfer.files[0];if(f)handle(f)});
